@@ -253,14 +253,13 @@ function drawStar(cx, cy, r, points) {
   ctx.fill();
 }
 
-// ===== PLAYER =====
-const player = {
+state.player = {
   x: 100,
   y: CONFIG.groundY - CONFIG.carHeight / 2,
   width: CONFIG.carWidth,
   height: CONFIG.carHeight,
   grounded: true,
-  jumpVel: 0,
+  playerVelocity: 0,
 };
 
 // ===== OBSTACLES =====
@@ -303,37 +302,37 @@ function drawPlayer() {
   // Car shadow
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
-  ctx.ellipse(player.x + 15, player.y + 10, player.width * 0.45, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(state.player.x + 15, state.player.y + 10, state.player.width * 0.45, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Car body
-  const carGrad = ctx.createLinearGradient(player.x, player.y, player.x, player.y + player.height);
+  const carGrad = ctx.createLinearGradient(state.player.x, state.player.y, state.player.x, state.player.y + state.player.height);
   carGrad.addColorStop(0, '#4a5568');
   carGrad.addColorStop(1, '#2d3748');
   ctx.fillStyle = carGrad;
-  drawRoundRect(player.x, player.y, player.width, player.height, 8);
+  drawRoundRect(state.player.x, state.player.y, state.player.width, state.player.height, 8);
   ctx.fill();
 
   // Car windows
   ctx.fillStyle = '#1e293b';
-  drawRoundRect(player.x + 10, player.y + 15, 18, 40, 4);
+  drawRoundRect(state.player.x + 10, state.player.y + 15, 18, 40, 4);
   ctx.fill();
-  drawRoundRect(player.x + player.width - 28, player.y + 15, 18, 40, 4);
+  drawRoundRect(state.player.x + state.player.width - 28, state.player.y + 15, 18, 40, 4);
   ctx.fill();
 
   // Windshield reflection
   ctx.fillStyle = 'rgba(59,130,246,0.15)';
   ctx.beginPath();
-  ctx.moveTo(player.x + 20, player.y + 20);
-  ctx.lineTo(player.x + 22, player.y + 30);
-  ctx.lineTo(player.x + 25, player.y + 20);
+  ctx.moveTo(state.player.x + 20, state.player.y + 20);
+  ctx.lineTo(state.player.x + 22, state.player.y + 30);
+  ctx.lineTo(state.player.x + 25, state.player.y + 20);
   ctx.closePath();
   ctx.fill();
 
   // Headlights
   ctx.fillStyle = '#fbbf24';
-  ctx.fillRect(player.x + 5, player.y + 10, 5, 6);
-  ctx.fillRect(player.x + player.width - 10, player.y + 10, 5, 6);
+  ctx.fillRect(state.player.x + 5, state.player.y + 10, 5, 6);
+  ctx.fillRect(state.player.x + state.player.width - 10, state.player.y + 10, 5, 6);
 }
 
 function drawObstacle(o) {
@@ -394,11 +393,8 @@ function updateGame(dt) {
   if (state.paused || state.gameOver) return;
 
   // Player movement
-  const keyPressed = getKeyDown();
-  if (keyPressed && state.player.grounded) {
-    // Space = jump
-  }
-  if (keyPressed && keyPressed.code === 'Space') {
+  const spacePressed = keysDown['Space'];
+  if (spacePressed && player.grounded) {
     player.playerVelocity = -CONFIG.playerSpeed * 0.4;
     player.grounded = false;
   }
@@ -424,6 +420,8 @@ function updateGame(dt) {
   // Coin collision
   for (const c of state.coins) {
     if (c.collected) continue;
+    const cx = player.x + CONFIG.carWidth / 2;
+    const cy = player.y + CONFIG.carHeight / 2;
     const dx = cx - c.x;
     const dy = cy - c.y;
     if (dx * dx + dy * dy < (CONFIG.carWidth / 2 + c.radius) * (CONFIG.carWidth / 2 + c.radius)) {
@@ -473,15 +471,6 @@ function updateGame(dt) {
     if (c.x < -20) {
       state.coins.splice(state.coins.indexOf(c), 1);
     }
-  }
-
-  // Update particles
-  for (let i = state.particles.length - 1; i >= 0; i--) {
-    const p = state.particles[i];
-    p.x += p.vx * dt * 60;
-    p.y += p.vy * dt * 60;
-    p.life -= 0.02;
-    if (p.life <= 0) state.particles.splice(i, 1);
   }
 
   // Score + time
@@ -624,7 +613,6 @@ function resumeGame() {
 
 function endGame() {
   state.running = false;
-  state.gameOver = true;
   state.gameOver = true;
   document.getElementById('scoreDisplay').textContent = Math.floor(state.score);
   document.getElementById('finalScore').textContent = Math.floor(state.score);
