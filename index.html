@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulang Kantor — The Rush Hour</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          dark: '#0d1117',
+          card: '#161b22',
+          amber: '#f59e0b',
+          emerald: '#10b981',
+          pink: '#ec4899',
+          cyan: '#06b6d4',
+          muted: '#6b7280'
+        }
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0d1117; }
+  .game-canvas { border-radius: 12px; box-shadow: 0 0 60px rgba(245,158,11,0.08); }
+  .btn-primary { transition: all 0.2s; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(245,158,11,0.3); }
+  .btn-primary:active { transform: translateY(0); }
+  .badge-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #0d1117; font-weight: 700; }
+  .badge-emerald { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  @keyframes slideUp { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-3px); } 75% { transform:translateX(3px); } }
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-slideUp { animation: slideUp 0.4s ease-out forwards; }
+  .game-over { animation: shake 0.5s ease-out; }
+  .overlay { backdrop-filter: blur(12px); background: rgba(0,0,0,0.6); }
+  .star { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #fbbf24; }
+</style>
+</head>
+<body class="overflow-hidden m-0 p-0 bg-dark text-white flex flex-col items-center justify-center min-h-screen">
+
+<!-- Menu -->
+<div id="menu-screen" class="fixed inset-0 flex flex-col items-center justify-center z-50" style="background: linear-gradient(135deg, #0d1117 0%, #1a1a2e 50%, #0d1117 100%);">
+  <div class="text-center animate-slideUp">
+    <div class="mb-2">
+      <span class="badge-gold text-sm px-3 py-1 rounded-full font-bold tracking-widest uppercase">Pulang Kantor</span>
+    </div>
+    <h1 class="text-5xl md:text-7xl font-black tracking-tight leading-none mb-4">
+      <span class="text-amber">Pulang</span>
+      <span class="text-white"> Kantor</span>
+      <span class="text-emerald"> The Rush Hour</span>
+    </h1>
+    <p class="text-slate-400 text-sm md:text-base max-w-md mx-auto mb-8 leading-relaxed">
+      Jangan kawal macet! Navigasi ojolmu melewati kemacetan Jakarta,
+      kumpulkan koin & hemat waktu agar sampai ke rumah tepat waktu.
+    </p>
+    <div class="flex flex-col items-center gap-3">
+      <button id="btnStart" class="btn-primary px-10 py-4 rounded-2xl bg-amber text-dark font-bold text-lg shadow-lg shadow-amber/20 hover:bg-amber/90 transition animate-float" onclick="startGame()">
+        Mulai Game <i class="fa-solid fa-play ml-2"></i>
+      </button>
+      <div class="flex gap-4">
+        <button class="px-4 py-2 rounded-xl bg-card text-slate-300 text-sm hover:bg-card hover:text-amber transition" onclick="showHighScores()">
+          <i class="fa-solid fa-trophy mr-1"></i> Hasil
+        </button>
+        <button class="px-4 py-2 rounded-xl bg-card text-slate-300 text-sm hover:bg-card hover:text-amber transition" onclick="resetGame()">
+          <i class="fa-solid fa-rotate-right mr-1"></i> Ulang
+        </button>
+      </div>
+    </div>
+    <div class="mt-10 text-xs text-slate-500">
+      <span class="inline-block w-2 h-2 rounded-full bg-amber mr-1"></span> Mode: Tekan layar untuk jalan
+      <span class="inline-block w-2 h-2 rounded-full bg-cyan ml-3"></span> Tekan Space untuk lompat
+      <span class="inline-block w-2 h-2 rounded-full bg-pink ml-1"></span> Tekan Space untuk dorong
+    </div>
+  </div>
+</div>
+
+<!-- Game Canvas -->
+<canvas id="gameCanvas" class="game-canvas w-full max-w-4xl" style="display:none;"></canvas>
+
+<!-- Score Overlay -->
+<div id="score-overlay" class="fixed top-4 left-4 z-50 hidden">
+  <div class="bg-card/90 rounded-xl px-4 py-2 border border-amber/20 shadow-lg">
+    <span class="text-sm text-slate-400">Skor:</span>
+    <span id="scoreDisplay" class="text-xl font-bold text-amber">0</span>
+  </div>
+</div>
+
+<!-- Combo Counter -->
+<div id="combo-display" class="fixed top-4 right-4 z-50 hidden">
+  <div class="bg-card/90 rounded-xl px-3 py-2 border border-emerald/20 shadow-lg">
+    <span class="text-sm text-emerald font-bold">Combo x1</span>
+  </div>
+</div>
+
+<!-- Time Bar -->
+<div id="time-bar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden">
+  <div class="bg-card/90 rounded-full px-4 py-2 border border-emerald/20 shadow-lg w-64">
+    <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+      <div id="timeProgress" class="bg-emerald h-full rounded-full transition-all" style="width:100%"></div>
+    </div>
+    <div class="flex justify-between text-xs text-slate-400 mt-1">
+      <span>Waktu:</span><span id="timeText">60s</span>
+    </div>
+  </div>
+</div>
+
+<!-- Pause Overlay -->
+<div id="pause-overlay" class="fixed inset-0 z-50 hidden overlay flex items-center justify-center">
+  <div class="bg-card/90 border border-slate-700 rounded-2xl p-8 text-center animate-slideUp">
+    <h2 class="text-2xl font-bold text-amber mb-6">DIPINDAHKAN</h2>
+    <div class="flex flex-col gap-3">
+      <button onclick="resumeGame()" class="px-6 py-3 rounded-xl bg-amber text-dark font-bold hover:bg-amber/90 transition">
+        Lanjutkan <i class="fa-solid fa-play ml-2"></i>
+      </button>
+      <button onclick="resetGame()" class="px-6 py-3 rounded-xl bg-card text-slate-300 font-semibold hover:bg-slate-700 transition">
+        Restart
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div id="gameover-screen" class="fixed inset-0 z-50 hidden overlay flex items-center justify-center">
+  <div class="bg-card border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center animate-slideUp">
+    <div class="text-6xl mb-4">😵</div>
+    <h2 class="text-3xl font-bold text-pink mb-2">GAGAL!!</h2>
+    <p class="text-slate-400 mb-6">Ojolmu tertabrak macet. Coba lagi, bang!</p>
+    <div class="flex justify-center gap-8 mb-6">
+      <div class="text-center">
+        <div class="text-xs text-slate-500 mb-1">Skor</div>
+        <div id="finalScore" class="text-3xl font-bold text-amber">0</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-slate-500 mb-1">Koin</div>
+        <div id="finalCoins" class="text-3xl font-bold text-emerald">0</div>
+      </div>
+    </div>
+    <div class="flex flex-col gap-3">
+      <button onclick="startGame()" class="px-8 py-3 rounded-xl bg-amber text-dark font-bold hover:bg-amber/90 transition">
+        Ulangi <i class="fa-solid fa-rotate-right ml-2"></i>
+      </button>
+      <button onclick="showHighScores()" class="px-8 py-3 rounded-xl bg-card text-slate-300 font-semibold hover:bg-slate-700 transition">
+        Hasil Lainnya
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- High Scores -->
+<div id="highScoresScreen" class="fixed inset-0 z-50 hidden overlay flex items-center justify-center">
+  <div class="bg-card border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4 animate-slideUp">
+    <h2 class="text-2xl font-bold text-amber mb-6 text-center">
+      <i class="fa-solid fa-trophy mr-2"></i> Hasil Tertinggi
+    </h2>
+    <div id="highScoreList" class="space-y-2 mb-6 max-h-60 overflow-y-auto">
+      <p class="text-slate-500 text-sm text-center">Tidak ada skor di daftar.</p>
+    </div>
+    <button onclick="closeHighScores()" class="w-full py-3 rounded-xl bg-slate-700 text-slate-300 font-semibold hover:bg-slate-600 transition">
+      Tutup
+    </button>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const CONFIG = {
+  canvas: { width: 1200, height: 800 },
+  groundY: 600,
+  carWidth: 60,
+  carHeight: 80,
+  playerSpeed: 300,
+  obstacleInterval: 500,
+  coinInterval: 700,
+  maxTime: 60,
+  coinsPerCoin: 10,
+};
+
+// ===== STATE =====
+let state = {
+  score: 0,
+  coins: 0,
+  combo: 1,
+  speed: 250,
+  timeLeft: CONFIG.maxTime,
+  running: false,
+  paused: false,
+  gameOver: false,
+  playerX: 100,
+  playerY: CONFIG.groundY - CONFIG.carHeight / 2,
+  playerVelocity: 0,
+  obstacles: [],
+  coins: [],
+  obstaclesToSpawn: [],
+  spawnTimer: 0,
+  spawnInterval: CONFIG.obstacleInterval,
+  coinSpawnTimer: 0,
+  coinSpawnInterval: CONFIG.coinInterval,
+  particles: [],
+  lastTime: 0,
+  gameTime: 0,
+  highScore: parseInt(localStorage.getItem('pulangKantorHighScore') || '0'),
+};
+
+// ===== CANVAS SETUP =====
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = CONFIG.canvas.width;
+canvas.height = CONFIG.canvas.height;
+
+// Resize canvas to fit container
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  const rect = container.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width);
+  canvas.height = Math.floor(rect.width * 0.67);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ===== UTILITIES =====
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function drawRoundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+function drawStar(cx, cy, r, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    const px = cx + Math.cos(angle) * rad;
+    const py = cy + Math.sin(angle) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ===== PLAYER =====
+const player = {
+  x: 100,
+  y: CONFIG.groundY - CONFIG.carHeight / 2,
+  width: CONFIG.carWidth,
+  height: CONFIG.carHeight,
+  grounded: true,
+  jumpVel: 0,
+};
+
+// ===== OBSTACLES =====
+function spawnObstacle() {
+  const types = [
+    { w: 50, h: 80, color: '#ef4444', points: 0 },
+    { w: 60, h: 60, color: '#6b7280', points: 0 },
+    { w: 40, h: 100, color: '#374151', points: 0 },
+    { w: 70, h: 50, color: '#4b5563', points: 0 },
+  ];
+  const type = types[rand(0, types.length - 1)];
+  const x = canvas.width + 20;
+  const y = rand(100, CONFIG.groundY - type.h - 20);
+  state.obstacles.push({ x, y, w: type.w, h: type.h, color: type.color, points: type.points });
+}
+
+// ===== COINS =====
+function spawnCoin() {
+  const x = canvas.width + 20;
+  const y = rand(100, CONFIG.groundY - 30);
+  state.coins.push({ x, y, radius: 12, collected: false, animationPhase: rand(0, Math.PI * 2) });
+}
+
+// ===== PARTICLES =====
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    state.particles.push({
+      x, y,
+      vx: rand(-3, 3),
+      vy: rand(-4, -1),
+      life: 1,
+      color,
+      size: rand(2, 5),
+    });
+  }
+}
+
+// ===== DRAWING =====
+function drawPlayer() {
+  // Car shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(player.x + 15, player.y + 10, player.width * 0.45, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Car body
+  const carGrad = ctx.createLinearGradient(player.x, player.y, player.x, player.y + player.height);
+  carGrad.addColorStop(0, '#4a5568');
+  carGrad.addColorStop(1, '#2d3748');
+  ctx.fillStyle = carGrad;
+  drawRoundRect(player.x, player.y, player.width, player.height, 8);
+  ctx.fill();
+
+  // Car windows
+  ctx.fillStyle = '#1e293b';
+  drawRoundRect(player.x + 10, player.y + 15, 18, 40, 4);
+  ctx.fill();
+  drawRoundRect(player.x + player.width - 28, player.y + 15, 18, 40, 4);
+  ctx.fill();
+
+  // Windshield reflection
+  ctx.fillStyle = 'rgba(59,130,246,0.15)';
+  ctx.beginPath();
+  ctx.moveTo(player.x + 20, player.y + 20);
+  ctx.lineTo(player.x + 22, player.y + 30);
+  ctx.lineTo(player.x + 25, player.y + 20);
+  ctx.closePath();
+  ctx.fill();
+
+  // Headlights
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillRect(player.x + 5, player.y + 10, 5, 6);
+  ctx.fillRect(player.x + player.width - 10, player.y + 10, 5, 6);
+}
+
+function drawObstacle(o) {
+  ctx.fillStyle = o.color;
+  drawRoundRect(o.x, o.y, o.w, o.h, 6);
+  ctx.fill();
+
+  // Traffic lights
+  const lightY = o.y + 15;
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(o.x + 4, lightY, 8, 8);
+  ctx.fillRect(o.x + 12, lightY, 8, 8);
+  ctx.fillRect(o.x + 20, lightY, 8, 8);
+}
+
+function drawCoin(c) {
+  if (c.collected) return;
+  const glow = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.radius * 2);
+  glow.addColorStop(0, 'rgba(10,200,130,0.3)');
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, c.radius * 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#10b981';
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Star highlight
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 8px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('★', c.x, c.y);
+}
+
+function drawParticles() {
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.03;
+    if (p.life <= 0) {
+      state.particles.splice(i, 1);
+      continue;
+    }
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size * p.life, p.size * p.life);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ===== GAME LOOP =====
+function updateGame(dt) {
+  if (state.paused || state.gameOver) return;
+
+  // Player movement
+  const keyPressed = getKeyDown();
+  if (keyPressed && state.player.grounded) {
+    // Space = jump
+  }
+  if (keyPressed && keyPressed.code === 'Space') {
+    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    player.grounded = false;
+  }
+
+  player.playerVelocity += 0.5 * dt; // gravity
+  player.y += player.playerVelocity * dt;
+  if (player.y + CONFIG.carHeight >= CONFIG.groundY) {
+    player.y = CONFIG.groundY - CONFIG.carHeight;
+    player.playerVelocity = 0;
+    player.grounded = true;
+  }
+
+  // Collision
+  for (const obs of state.obstacles) {
+    const cx = player.x + CONFIG.carWidth / 2;
+    const cy = player.y + CONFIG.carHeight / 2;
+    if (cx > obs.x && cx < obs.x + obs.w && cy > obs.y && cy < obs.y + obs.h) {
+      endGame();
+      return;
+    }
+  }
+
+  // Coin collision
+  for (const c of state.coins) {
+    if (c.collected) continue;
+    const dx = cx - c.x;
+    const dy = cy - c.y;
+    if (dx * dx + dy * dy < (CONFIG.carWidth / 2 + c.radius) * (CONFIG.carWidth / 2 + c.radius)) {
+      c.collected = true;
+      state.coins++;
+      state.score += 10;
+      spawnParticles(c.x, c.y, '#10b981', 8);
+      if (state.coins % 5 === 0) {
+        state.combo++;
+        document.getElementById('combo-display').classList.remove('hidden');
+        document.getElementById('combo-display').innerHTML = `<span class="text-sm text-emerald font-bold">Combo x${state.combo}</span>`;
+        setTimeout(() => {
+          document.getElementById('combo-display').classList.add('hidden');
+          state.combo = 1;
+        }, 2000);
+      }
+    }
+  }
+
+  // Spawn obstacles
+  state.spawnTimer -= dt * 1000;
+  if (state.spawnTimer <= 0) {
+    spawnObstacle();
+    state.spawnTimer = state.spawnInterval;
+    state.spawnInterval = Math.max(300, state.spawnInterval - 30);
+  }
+
+  // Spawn coins
+  state.coinSpawnTimer -= dt * 1000;
+  if (state.coinSpawnTimer <= 0) {
+    spawnCoin();
+    state.coinSpawnTimer = state.coinSpawnInterval;
+  }
+
+  // Update obstacle positions
+  for (const obs of state.obstacles) {
+    obs.x -= state.speed * dt;
+    if (obs.x + obs.w < 0) {
+      state.obstacles.splice(state.obstacles.indexOf(obs), 1);
+    }
+  }
+
+  // Update coin positions
+  for (const c of state.coins) {
+    c.x -= state.speed * dt;
+    c.animationPhase += dt * 3;
+    if (c.x < -20) {
+      state.coins.splice(state.coins.indexOf(c), 1);
+    }
+  }
+
+  // Update particles
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.x += p.vx * dt * 60;
+    p.y += p.vy * dt * 60;
+    p.life -= 0.02;
+    if (p.life <= 0) state.particles.splice(i, 1);
+  }
+
+  // Score + time
+  state.score += dt * 0.5;
+  state.timeLeft -= dt;
+  if (state.timeLeft <= 0) {
+    endGame();
+    return;
+  }
+
+  // Update UI
+  document.getElementById('scoreDisplay').textContent = Math.floor(state.score);
+  document.getElementById('timeText').textContent = Math.ceil(state.timeLeft) + 's';
+  document.getElementById('timeProgress').style.width = (state.timeLeft / CONFIG.maxTime) * 100 + '%';
+  if (state.timeLeft < 10) {
+    document.getElementById('timeProgress').style.background = '#ef4444';
+  } else {
+    document.getElementById('timeProgress').style.background = '#10b981';
+  }
+}
+
+function drawGame() {
+  // Sky gradient
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, CONFIG.groundY);
+  skyGrad.addColorStop(0, '#1e1e3a');
+  skyGrad.addColorStop(0.5, '#0f172a');
+  skyGrad.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, canvas.width, CONFIG.groundY);
+
+  // Stars (subtle)
+  for (let i = 0; i < 30; i++) {
+    const sx = (i * 37 + 13) % canvas.width;
+    const sy = (i * 71 + 7) % 100;
+    const brightness = 0.3 + Math.sin(Date.now() * 0.001 + i) * 0.2;
+    ctx.fillStyle = `rgba(255,255,255,${brightness})`;
+    ctx.fillRect(sx, sy, 1, 1);
+  }
+
+  // City buildings silhouette
+  ctx.fillStyle = '#0d1117';
+  for (let i = 0; i < 15; i++) {
+    const bx = i * 75 + 10;
+    const bh = rand(40, 120);
+    const bw = rand(30, 50);
+    ctx.fillRect(bx, CONFIG.groundY - bh - 20, bw, bh + 20);
+  }
+
+  // Ground
+  const groundGrad = ctx.createLinearGradient(0, CONFIG.groundY, 0, canvas.height);
+  groundGrad.addColorStop(0, '#2d3748');
+  groundGrad.addColorStop(1, '#1a202c');
+  ctx.fillStyle = groundGrad;
+  ctx.fillRect(0, CONFIG.groundY, canvas.width, canvas.height - CONFIG.groundY);
+
+  // Road line
+  ctx.strokeStyle = '#4a5568';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 15]);
+  ctx.beginPath();
+  ctx.moveTo(0, CONFIG.groundY);
+  ctx.lineTo(canvas.width, CONFIG.groundY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw obstacles
+  for (const obs of state.obstacles) {
+    drawObstacle(obs);
+  }
+
+  // Draw coins
+  for (const c of state.coins) {
+    drawCoin(c);
+  }
+
+  // Draw player
+  drawPlayer();
+
+  // Draw particles
+  drawParticles();
+
+  // Traffic light glow on ground
+  ctx.fillStyle = 'rgba(245,158,11,0.1)';
+  ctx.beginPath();
+  ctx.ellipse(CONFIG.groundY - 30, CONFIG.groundY - 20, 50, 50, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function gameLoop() {
+  const now = performance.now();
+  const dt = Math.min((now - state.lastTime) / 1000, 0.05);
+  state.lastTime = now;
+  updateGame(dt);
+  drawGame();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  state.score = 0;
+  state.coins = 0;
+  state.combo = 1;
+  state.speed = 250;
+  state.timeLeft = CONFIG.maxTime;
+  state.running = true;
+  state.paused = false;
+  state.gameOver = false;
+  state.obstacles = [];
+  state.coins = [];
+  state.particles = [];
+  state.player.x = 100;
+  state.player.y = CONFIG.groundY - CONFIG.carHeight / 2;
+  state.player.grounded = true;
+  state.player.playerVelocity = 0;
+
+  document.getElementById('menu-screen').classList.add('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('pause-overlay').classList.add('hidden');
+  document.getElementById('score-overlay').classList.remove('hidden');
+  document.getElementById('time-bar').classList.remove('hidden');
+  document.getElementById('combo-display').classList.remove('hidden');
+
+  canvas.style.display = 'block';
+  state.lastTime = performance.now();
+  gameLoop();
+}
+
+function pauseGame() {
+  state.paused = !state.paused;
+  if (state.paused) {
+    document.getElementById('pause-overlay').classList.remove('hidden');
+  } else {
+    document.getElementById('pause-overlay').classList.add('hidden');
+  }
+}
+
+function resumeGame() {
+  state.paused = false;
+  document.getElementById('pause-overlay').classList.add('hidden');
+}
+
+function endGame() {
+  state.running = false;
+  state.gameOver = true;
+  state.gameOver = true;
+  document.getElementById('scoreDisplay').textContent = Math.floor(state.score);
+  document.getElementById('finalScore').textContent = Math.floor(state.score);
+  document.getElementById('finalCoins').textContent = state.coins;
+  if (state.score > state.highScore) {
+    state.highScore = Math.floor(state.score);
+    localStorage.setItem('pulangKantorHighScore', state.highScore);
+  }
+  setTimeout(() => {
+    document.getElementById('gameover-screen').classList.remove('hidden');
+  }, 500);
+}
+
+function resetGame() {
+  state.score = 0;
+  state.coins = 0;
+  state.combo = 1;
+  state.speed = 250;
+  state.timeLeft = CONFIG.maxTime;
+  state.running = true;
+  state.paused = false;
+  state.gameOver = false;
+  state.obstacles = [];
+  state.coins = [];
+  state.particles = [];
+  state.player.x = 100;
+  state.player.y = CONFIG.groundY - CONFIG.carHeight / 2;
+  state.player.grounded = true;
+  state.player.playerVelocity = 0;
+  canvas.style.display = 'block';
+  document.getElementById('menu-screen').classList.remove('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('pause-overlay').classList.add('hidden');
+  document.getElementById('score-overlay').classList.remove('hidden');
+  document.getElementById('time-bar').classList.remove('hidden');
+  document.getElementById('combo-display').classList.remove('hidden');
+  document.getElementById('scoreDisplay').textContent = '0';
+  document.getElementById('timeText').textContent = '60s';
+  document.getElementById('finalScore').textContent = '0';
+  document.getElementById('finalCoins').textContent = '0';
+}
+
+// Input handling
+const keysDown = {};
+
+window.addEventListener('keydown', (e) => {
+  keysDown[e.code] = true;
+  if (e.code === 'Space' && state.running && !state.paused && !state.gameOver) {
+    e.preventDefault();
+    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    player.grounded = false;
+  }
+  if (e.code === 'Escape' && state.running && !state.paused && !state.gameOver) {
+    pauseGame();
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  keysDown[e.code] = false;
+});
+
+// Touch handling for mobile
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (state.running && !state.paused && !state.gameOver) {
+    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    player.grounded = false;
+  }
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+});
+
+canvas.addEventListener('click', (e) => {
+  if (state.running && !state.paused && !state.gameOver) {
+    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    player.grounded = false;
+  }
+});
+
+// Menu clicks
+document.getElementById('btnStart').addEventListener('click', () => {
+  startGame();
+});
+
+// High scores
+function showHighScores() {
+  const list = document.getElementById('highScoreList');
+  const score = state.highScore;
+  if (score > 0) {
+    list.innerHTML = `
+      <div class="flex justify-between text-sm"><span>Skor Terbaru</span><span class="text-amber font-bold">${score}</span></div>
+      <div class="flex justify-between text-sm"><span>Rekor Tertinggi</span><span class="text-emerald font-bold">${Math.max(score, state.highScore)}</span></div>
+      <div class="flex justify-between text-sm"><span>Total Jelajah</span><span class="text-cyan font-bold">${Math.floor(state.score)}</span></div>
+    `;
+  } else {
+    list.innerHTML = '<div class="text-sm text-slate-500 text-center">Tidak ada skor. Main dulu!</div>';
+  }
+  document.getElementById('highScoresScreen').classList.remove('hidden');
+}
+
+function closeHighScores() {
+  document.getElementById('highScoresScreen').classList.add('hidden');
+}
+
+// ===== DRAW MENU =====
+function drawMenu() {
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const gradient = ctx.createRadialGradient(canvas.width / 2, 150, 50, canvas.width / 2, 150, 400);
+  gradient.addColorStop(0, 'rgba(245,158,11,0.05)');
+  gradient.addColorStop(1, 'transparent');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// ===== MAIN LOOP =====
+function mainLoop() {
+  const now = performance.now();
+  const dt = Math.min((now - state.lastTime) / 1000, 0.05);
+  state.lastTime = now;
+
+  if (document.getElementById('menu-screen').style.display !== 'none') {
+    drawMenu();
+  }
+
+  requestAnimationFrame(mainLoop);
+}
+
+// ===== KEYBOARD =====
+function getKeyDown() {
+  return keysDown;
+}
+
+// ===== INIT =====
+state.lastTime = performance.now();
+requestAnimationFrame(mainLoop);
+</script>
+</body>
+</html>
