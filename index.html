@@ -727,7 +727,7 @@ function mainLoop() {
   const dt = Math.min((now - state.lastTime) / 1000, 0.05);
   state.lastTime = now;
 
-  if (document.getElementById('menu-screen').style.display !== 'none') {
+  if (!state.running && document.getElementById('menu-screen').classList.contains('hidden') === false) {
     drawMenu();
   }
 
