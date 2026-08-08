@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pulang Kantor — The Rush Hour</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script>
   tailwind.config = {
     theme: {
@@ -213,15 +214,8 @@ const ctx = canvas.getContext('2d');
 canvas.width = CONFIG.canvas.width;
 canvas.height = CONFIG.canvas.height;
 
-// Resize canvas to fit container
-function resizeCanvas() {
-  const container = canvas.parentElement;
-  const rect = container.getBoundingClientRect();
-  canvas.width = Math.floor(rect.width);
-  canvas.height = Math.floor(rect.width * 0.67);
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+// Internal resolution is fixed (CONFIG.canvas 1200x800); CSS class w-full/max-w-4xl
+// handles display scaling, so mobile stays playable without breaking draw coordinates.
 
 // ===== UTILITIES =====
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -327,6 +321,9 @@ skyGrad.addColorStop(1, '#1a1a2e');
 const groundGrad = ctx.createLinearGradient(0, CONFIG.groundY, 0, canvas.height);
 groundGrad.addColorStop(0, '#2d3748');
 groundGrad.addColorStop(1, '#1a202c');
+
+// ===== PLAYER =====
+function drawPlayer() {
   // Car shadow
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
@@ -455,7 +452,9 @@ function updateGame(dt) {
     if (dx * dx + dy * dy < (CONFIG.carWidth / 2 + c.radius) * (CONFIG.carWidth / 2 + c.radius)) {
       c.collected = true;
       state.coinsCount = (state.coinsCount || 0) + 1;
-      state.score += 10;
+      state.combo = Math.min(state.combo + 1, 5);
+      state.score += CONFIG.coinsPerCoin * state.combo;
+      document.querySelector('#combo-display span').textContent = 'Combo x' + state.combo;
       spawnParticles(c.x, c.y, '#10b981', 8);
     }
   }
@@ -562,7 +561,7 @@ function drawGame() {
   // Traffic light glow on ground
   ctx.fillStyle = 'rgba(245,158,11,0.1)';
   ctx.beginPath();
-  ctx.ellipse(CONFIG.groundY - 30, CONFIG.groundY - 20, 50, 50, 0, 0, Math.PI * 2);
+  ctx.ellipse(canvas.width - 30, CONFIG.groundY - 20, 50, 50, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
