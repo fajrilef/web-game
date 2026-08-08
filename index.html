@@ -146,6 +146,9 @@
       <button onclick="startGame()" class="px-8 py-3 rounded-xl bg-amber text-dark font-bold hover:bg-amber/90 transition">
         Ulangi <i class="fa-solid fa-rotate-right ml-2"></i>
       </button>
+      <button onclick="backToMenu()" class="px-8 py-3 rounded-xl bg-card text-slate-300 font-semibold hover:bg-slate-700 transition">
+        <i class="fa-solid fa-house ml-2"></i> Ke Menu
+      </button>
       <button onclick="showHighScores()" class="px-8 py-3 rounded-xl bg-card text-slate-300 font-semibold hover:bg-slate-700 transition">
         Hasil Lainnya
       </button>
@@ -176,6 +179,9 @@ const CONFIG = {
   carWidth: 60,
   carHeight: 80,
   playerSpeed: 300,
+  gravity: 3.0,
+  jumpVelocity: -240,
+  fallMultiplier: 1.5,
   obstacleInterval: 500,
   coinInterval: 700,
   maxTime: 60,
@@ -324,40 +330,81 @@ groundGrad.addColorStop(1, '#1a202c');
 
 // ===== PLAYER =====
 function drawPlayer() {
-  // Car shadow
+  const x = state.player.x;
+  const y = state.player.y;
+  const w = state.player.width;
+  const h = state.player.height;
+
+  // Shadow
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
-  ctx.ellipse(state.player.x + 15, state.player.y + 10, state.player.width * 0.45, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w / 2, y + h - 2, w * 0.5, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Car body
-  const carGrad = ctx.createLinearGradient(state.player.x, state.player.y, state.player.x, state.player.y + state.player.height);
-  carGrad.addColorStop(0, '#4a5568');
-  carGrad.addColorStop(1, '#2d3748');
-  ctx.fillStyle = carGrad;
-  drawRoundRect(state.player.x, state.player.y, state.player.width, state.player.height, 8);
+  // Door slab (warm wood)
+  const doorGrad = ctx.createLinearGradient(x, y, x + w, y);
+  doorGrad.addColorStop(0, '#92400e');
+  doorGrad.addColorStop(0.5, '#b45309');
+  doorGrad.addColorStop(1, '#7c2d12');
+  ctx.fillStyle = doorGrad;
+  drawRoundRect(x, y, w, h, 8);
   ctx.fill();
 
-  // Car windows
+  // Door frame
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  drawRoundRect(x + 2, y + 2, w - 4, h - 4, 7);
+  ctx.stroke();
+
+  // Top window (glass)
   ctx.fillStyle = '#1e293b';
-  drawRoundRect(state.player.x + 10, state.player.y + 15, 18, 40, 4);
+  drawRoundRect(x + 8, y + 10, w - 16, 22, 4);
   ctx.fill();
-  drawRoundRect(state.player.x + state.player.width - 28, state.player.y + 15, 18, 40, 4);
-  ctx.fill();
-
-  // Windshield reflection
-  ctx.fillStyle = 'rgba(59,130,246,0.15)';
+  // Window cross bars
+  ctx.strokeStyle = '#78350f';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(state.player.x + 20, state.player.y + 20);
-  ctx.lineTo(state.player.x + 22, state.player.y + 30);
-  ctx.lineTo(state.player.x + 25, state.player.y + 20);
+  ctx.moveTo(x + w / 2, y + 10);
+  ctx.lineTo(x + w / 2, y + 32);
+  ctx.moveTo(x + 8, y + 21);
+  ctx.lineTo(x + w - 8, y + 21);
+  ctx.stroke();
+  // Glass reflection
+  ctx.fillStyle = 'rgba(148,163,184,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y + 14);
+  ctx.lineTo(x + 18, y + 28);
+  ctx.lineTo(x + 24, y + 14);
   ctx.closePath();
   ctx.fill();
 
-  // Headlights
+  // Middle panel
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  drawRoundRect(x + 8, y + 40, w - 16, 16, 3);
+  ctx.fill();
+
+  // Bottom panel
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  drawRoundRect(x + 8, y + 62, w - 16, 12, 3);
+  ctx.fill();
+
+  // Door handle (knob)
   ctx.fillStyle = '#fbbf24';
-  ctx.fillRect(state.player.x + 5, state.player.y + 10, 5, 6);
-  ctx.fillRect(state.player.x + state.player.width - 10, state.player.y + 10, 5, 6);
+  ctx.beginPath();
+  ctx.arc(x + w - 12, y + h / 2 + 4, 4, 0, Math.PI * 2);
+  ctx.fill();
+  // Handle highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.arc(x + w - 13, y + h / 2 + 3, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // "PULANG" sign on the door
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PULANG', x + w / 2, y + 52);
 }
 
 function drawObstacle(o) {
@@ -420,11 +467,13 @@ function updateGame(dt) {
   // Player movement
   const spacePressed = keysDown['Space'];
   if (spacePressed && state.player.grounded) {
-    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.playerVelocity = CONFIG.jumpVelocity;
     state.player.grounded = false;
   }
 
-  state.player.playerVelocity += 0.5 * dt * 60; // gravity
+  // Gravity: heavier when falling for snappy descent
+  const gravity = state.player.playerVelocity > 0 ? CONFIG.gravity * CONFIG.fallMultiplier : CONFIG.gravity;
+  state.player.playerVelocity += gravity * dt * 60;
   state.player.y += state.player.playerVelocity * dt;
   if (state.player.y + CONFIG.carHeight >= CONFIG.groundY) {
     state.player.y = CONFIG.groundY - CONFIG.carHeight;
@@ -653,6 +702,19 @@ function resetGame() {
   document.getElementById('finalCoins').textContent = '0';
 }
 
+function backToMenu() {
+  state.running = false;
+  state.paused = false;
+  state.gameOver = false;
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('pause-overlay').classList.add('hidden');
+  document.getElementById('score-overlay').classList.add('hidden');
+  document.getElementById('time-bar').classList.add('hidden');
+  document.getElementById('combo-display').classList.add('hidden');
+  canvas.style.display = 'none';
+  document.getElementById('menu-screen').classList.remove('hidden');
+}
+
 // Input handling
 const keysDown = {};
 
@@ -660,7 +722,7 @@ window.addEventListener('keydown', (e) => {
   keysDown[e.code] = true;
   if (e.code === 'Space' && state.running && !state.paused && !state.gameOver) {
     e.preventDefault();
-    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.playerVelocity = CONFIG.jumpVelocity;
     state.player.grounded = false;
   }
   if (e.code === 'Escape' && state.running && !state.paused && !state.gameOver) {
@@ -676,7 +738,7 @@ window.addEventListener('keyup', (e) => {
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (state.running && !state.paused && !state.gameOver) {
-    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.playerVelocity = CONFIG.jumpVelocity;
     state.player.grounded = false;
   }
 });
@@ -687,7 +749,7 @@ canvas.addEventListener('touchmove', (e) => {
 
 canvas.addEventListener('click', (e) => {
   if (state.running && !state.paused && !state.gameOver) {
-    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.playerVelocity = CONFIG.jumpVelocity;
     state.player.grounded = false;
   }
 });
