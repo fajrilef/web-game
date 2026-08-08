@@ -566,14 +566,7 @@ function drawGame() {
   ctx.fill();
 }
 
-function gameLoop() {
-  const now = performance.now();
-  const dt = Math.min((now - state.lastTime) / 1000, 0.05);
-  state.lastTime = now;
-  updateGame(dt);
-  drawGame();
-  requestAnimationFrame(gameLoop);
-}
+// ===== GAME LOOP (dihapus, nggak dipanggil lagi) =====
 
 function startGame() {
   state.score = 0;
@@ -601,7 +594,6 @@ function startGame() {
 
   canvas.style.display = 'block';
   state.lastTime = performance.now();
-  gameLoop();
 }
 
 function pauseGame() {
@@ -737,13 +729,15 @@ function drawMenu() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-// ===== MAIN LOOP =====
 function mainLoop() {
   const now = performance.now();
   const dt = Math.min((now - state.lastTime) / 1000, 0.05);
   state.lastTime = now;
 
-  if (!state.running && document.getElementById('menu-screen').classList.contains('hidden') === false) {
+  if (state.running && !state.paused && !state.gameOver) {
+    updateGame(dt);
+    drawGame();
+  } else if (!state.running && document.getElementById('menu-screen').classList.contains('hidden') === false) {
     drawMenu();
   }
 
