@@ -297,8 +297,36 @@ function spawnParticles(x, y, color, count) {
   }
 }
 
-// ===== DRAWING =====
-function drawPlayer() {
+// ===== PRE-COMPUTED STATIC ELEMENTS =====
+// Stars - pre-compute once
+const stars = [];
+for (let i = 0; i < 30; i++) {
+  stars.push({
+    x: (i * 37 + 13) % CONFIG.canvas.width,
+    y: (i * 71 + 7) % 100,
+    phase: i * 0.1
+  });
+}
+
+// Buildings - pre-compute once
+const buildings = [];
+for (let i = 0; i < 15; i++) {
+  buildings.push({
+    x: i * 75 + 10,
+    height: rand(40, 120),
+    width: rand(30, 50)
+  });
+}
+
+// Pre-create gradients
+const skyGrad = ctx.createLinearGradient(0, 0, 0, CONFIG.groundY);
+skyGrad.addColorStop(0, '#0d1117');
+skyGrad.addColorStop(0.5, '#0f172a');
+skyGrad.addColorStop(1, '#1a1a2e');
+
+const groundGrad = ctx.createLinearGradient(0, CONFIG.groundY, 0, canvas.height);
+groundGrad.addColorStop(0, '#2d3748');
+groundGrad.addColorStop(1, '#1a202c');
   // Car shadow
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
@@ -484,36 +512,24 @@ function updateGame(dt) {
 }
 
 function drawGame() {
-  // Sky gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, CONFIG.groundY);
-  skyGrad.addColorStop(0, '#1e1e3a');
-  skyGrad.addColorStop(0.5, '#0f172a');
-  skyGrad.addColorStop(1, '#1a1a2e');
+  // Sky gradient (pre-computed)
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, canvas.width, CONFIG.groundY);
 
-  // Stars (subtle)
-  for (let i = 0; i < 30; i++) {
-    const sx = (i * 37 + 13) % canvas.width;
-    const sy = (i * 71 + 7) % 100;
-    const brightness = 0.3 + Math.sin(Date.now() * 0.001 + i) * 0.2;
+  // Stars (pre-computed, animate brightness)
+  for (const star of stars) {
+    const brightness = 0.3 + Math.sin(performance.now() * 0.001 + star.phase) * 0.2;
     ctx.fillStyle = `rgba(255,255,255,${brightness})`;
-    ctx.fillRect(sx, sy, 1, 1);
+    ctx.fillRect(star.x, star.y, 1, 1);
   }
 
-  // City buildings silhouette
+  // City buildings silhouette (pre-computed)
   ctx.fillStyle = '#0d1117';
-  for (let i = 0; i < 15; i++) {
-    const bx = i * 75 + 10;
-    const bh = rand(40, 120);
-    const bw = rand(30, 50);
-    ctx.fillRect(bx, CONFIG.groundY - bh - 20, bw, bh + 20);
+  for (const b of buildings) {
+    ctx.fillRect(b.x, CONFIG.groundY - b.height - 20, b.width, b.height + 20);
   }
 
-  // Ground
-  const groundGrad = ctx.createLinearGradient(0, CONFIG.groundY, 0, canvas.height);
-  groundGrad.addColorStop(0, '#2d3748');
-  groundGrad.addColorStop(1, '#1a202c');
+  // Ground (pre-computed gradient)
   ctx.fillStyle = groundGrad;
   ctx.fillRect(0, CONFIG.groundY, canvas.width, canvas.height - CONFIG.groundY);
 
