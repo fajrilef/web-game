@@ -653,8 +653,8 @@ window.addEventListener('keydown', (e) => {
   keysDown[e.code] = true;
   if (e.code === 'Space' && state.running && !state.paused && !state.gameOver) {
     e.preventDefault();
-    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
-    player.grounded = false;
+    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.grounded = false;
   }
   if (e.code === 'Escape' && state.running && !state.paused && !state.gameOver) {
     pauseGame();
@@ -669,8 +669,8 @@ window.addEventListener('keyup', (e) => {
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (state.running && !state.paused && !state.gameOver) {
-    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
-    player.grounded = false;
+    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.grounded = false;
   }
 });
 
@@ -680,8 +680,8 @@ canvas.addEventListener('touchmove', (e) => {
 
 canvas.addEventListener('click', (e) => {
   if (state.running && !state.paused && !state.gameOver) {
-    player.playerVelocity = -CONFIG.playerSpeed * 0.4;
-    player.grounded = false;
+    state.player.playerVelocity = -CONFIG.playerSpeed * 0.4;
+    state.player.grounded = false;
   }
 });
 
